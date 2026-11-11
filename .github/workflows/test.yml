@@ -1,0 +1,51 @@
+name: test
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "29"
+          gleam-version: "1.19.2"
+          rebar3-version: "3"
+      - run: gleam deps download
+      - run: gleam test
+      - run: gleam format --check src test
+
+  example:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        example: [demo, linking]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: examples/${{ matrix.example }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "29"
+          gleam-version: "1.19.2"
+          rebar3-version: "3"
+      - uses: dtolnay/rust-toolchain@stable
+      # Builds the Rust crate into priv/, regenerating its glue first.
+      - run: gleam run -m hermit build
+      # The generated files are committed, so they must match the interface.
+      - run: git diff --exit-code -- .
+      - run: gleam test
+      - run: gleam format --check src test

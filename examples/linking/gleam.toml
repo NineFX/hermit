@@ -1,0 +1,13 @@
+name = "linking"
+version = "1.0.0"
+description = "An example of hermit NIFs that call C libraries"
+
+[dependencies]
+gleam_stdlib = ">= 1.0.0 and < 2.0.0"
+
+[dev_dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"
+hermit = { path = "../.." }
+
+[[tools.hermit.nif]]
+module = "linking/native"

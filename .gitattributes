@@ -1,0 +1,3 @@
+# Keep LF endings on Windows too. Hermit compares generated files byte for
+# byte, and the tests embed multi-line strings.
+* text=auto eol=lf
