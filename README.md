@@ -321,28 +321,36 @@ unsafe extern "C" {
 ```
 
 To ship a shared library with the app instead, put it in `priv/` beside the
-NIF and give the NIF an rpath that points to its own directory. This build
-script links against `vendor/libfoo` in the crate and sets the rpath:
+NIF. On Linux and macOS, also give the NIF an rpath that points to its own
+directory; Windows already searches the NIF's directory for the DLLs it
+needs. This build script links against `foo` in the crate's `vendor/`
+directory and sets the rpath:
 
 ```rust
 fn main() {
     let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     println!("cargo:rustc-link-search=native={dir}/vendor");
     println!("cargo:rustc-link-lib=dylib=foo");
-    let origin = match std::env::var("CARGO_CFG_TARGET_OS").unwrap().as_str() {
-        "macos" => "@loader_path",
-        _ => "$ORIGIN",
-    };
-    println!("cargo:rustc-link-arg=-Wl,-rpath,{origin}");
+    match std::env::var("CARGO_CFG_TARGET_OS").unwrap().as_str() {
+        "windows" => {}
+        "macos" => println!("cargo:rustc-link-arg=-Wl,-rpath,@loader_path"),
+        _ => println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN"),
+    }
 }
 ```
 
-Hermit installs only the NIF, so copying the library into `priv/` is up to
-you. If you commit it there, ignore the NIF by name rather than `priv/*.so`.
-On macOS, the rpath applies only if the library's install name starts with
-`@rpath/`: `otool -D` shows the name, and
-`install_name_tool -id @rpath/libfoo.dylib` changes it. Windows has no rpath,
-and hermit has not been tested with DLL dependencies there.
+`vendor/` holds `libfoo.so` on Linux, `libfoo.dylib` on macOS, and on
+Windows both `foo.dll` and the import library `foo.lib` that the NIF links
+with. Hermit installs only the NIF, so copying the library into `priv/` is up
+to you. If you commit it there, ignore the NIF by name rather than
+`priv/*.so`. On macOS, the rpath applies only if the library's install name
+starts with `@rpath/`: `otool -D` shows the name, and
+`install_name_tool -id @rpath/libfoo.dylib` changes it.
+
+[`examples/linking`](examples/linking) does all of this, and CI runs it on
+Linux, macOS, and Windows. Its `build.rs` compiles a C file into the NIF,
+builds a second C file as a shared library to stand in for a vendor's, and
+installs that library in `priv/`.
 
 Native code runs inside the VM, with fewer protections than Rust:
 
@@ -398,7 +406,9 @@ interface from Erlang (for example `-spec` attributes) and its settings from
 gleam test                 # Unit tests
 gleam format --check src test
 
-cd examples/demo
+cd examples/demo           # Or examples/linking
 gleam run -m hermit build  # Regenerate and compile the example's NIFs
 gleam test                 # Call every NIF from Gleam
 ```
+
+CI runs all of this on Linux, macOS, and Windows.
