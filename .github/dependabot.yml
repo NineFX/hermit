@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # Opens a pull request for each new release of Rustler and the other crates
+  # the examples use, so CI tests it on every system. When a Rustler release
+  # starts a new series, the hermit tests fail until `rustler_version` in
+  # src/hermit/rust.gleam moves with it.
+  - package-ecosystem: cargo
+    directories:
+      - /examples/demo/native/demo_native
+      - /examples/linking/native/linking_native
+    schedule:
+      interval: weekly
+    groups:
+      crates:
+        patterns: ["*"]
+        # One pull request per crate, covering every example that uses it.
+        group-by: dependency-name
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

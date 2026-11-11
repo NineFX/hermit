@@ -16,6 +16,7 @@ import gleam/set.{type Set}
 import gleam/string
 import hermit/ir
 import hermit/naming
+import tom
 
 /// The Rustler release generated crates depend on.
 pub const rustler_version = "0.39"
@@ -1134,6 +1135,50 @@ crate-type = [\"cdylib\"]
 [dependencies]
 rustler = \"" <> rustler_version <> "\"
 "
+}
+
+/// Checks that a crate's `Cargo.toml` depends on the Rustler release series
+/// that generated code is written for, `rustler_version`. Returns the crate's
+/// version requirement if it selects another series. A requirement hermit
+/// cannot compare, such as a range or a Git checkout, passes.
+pub fn check_rustler_dependency(cargo_toml: String) -> Result(Nil, String) {
+  let found = {
+    use toml <- result.try(tom.parse(cargo_toml) |> result.replace_error(Nil))
+    use requirement <- result.try(
+      tom.get_string(toml, ["dependencies", "rustler"])
+      |> result.lazy_or(fn() {
+        tom.get_string(toml, ["dependencies", "rustler", "version"])
+      })
+      |> result.replace_error(Nil),
+    )
+    use series <- result.map(release_series(requirement))
+    #(requirement, series)
+  }
+  case found {
+    Ok(#(requirement, series)) ->
+      case Ok(series) == release_series(rustler_version) {
+        True -> Ok(Nil)
+        False -> Error(requirement)
+      }
+    Error(Nil) -> Ok(Nil)
+  }
+}
+
+/// The release series that a Cargo version requirement such as `0.39` or
+/// `^0.39.1` selects from. Cargo treats the releases in a series as
+/// compatible: `0.39.x` for a `0.` version, and `1.x.y` from `1.0` on. Fails
+/// for a requirement that is not a single version.
+fn release_series(requirement: String) -> Result(String, Nil) {
+  let version = case string.trim(requirement) {
+    "^" <> version | "=" <> version | "~" <> version ->
+      string.trim_start(version)
+    version -> version
+  }
+  case string.split(version, ".") |> list.map(int.parse) {
+    [Ok(0), Ok(minor), ..] -> Ok("0." <> int.to_string(minor))
+    [Ok(major), ..] if major > 0 -> Ok(int.to_string(major))
+    _ -> Error(Nil)
+  }
 }
 
 /// The contents of the crate's `.gitignore`, written once.

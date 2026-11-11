@@ -284,6 +284,34 @@ pub fn finds_missing_stubs_test() {
   assert rust.missing_stubs(lib, []) == rust.stubs(lib)
 }
 
+pub fn check_rustler_dependency_test() {
+  let with = fn(dependency) {
+    "[package]\nname = \"app_nif\"\n\n[dependencies]\nrustler = "
+    <> dependency
+    <> "\n"
+  }
+  let version = rust.rustler_version
+  assert rust.check_rustler_dependency(rust.cargo_toml(library([], [])))
+    == Ok(Nil)
+  assert rust.check_rustler_dependency(with("\"^" <> version <> ".2\""))
+    == Ok(Nil)
+  assert rust.check_rustler_dependency(with(
+      "{ version = \"=" <> version <> ".0\", default-features = false }",
+    ))
+    == Ok(Nil)
+  assert rust.check_rustler_dependency(with("\"0.1\"")) == Error("0.1")
+  assert rust.check_rustler_dependency(with("{ version = \"0.1.0\" }"))
+    == Error("0.1.0")
+  assert rust.check_rustler_dependency(with("\"999\"")) == Error("999")
+  // Hermit cannot compare these, so it lets them through.
+  assert rust.check_rustler_dependency(with("\">= 0.1, < 999\"")) == Ok(Nil)
+  assert rust.check_rustler_dependency(with(
+      "{ git = \"https://github.com/rusterlium/rustler\" }",
+    ))
+    == Ok(Nil)
+  assert rust.check_rustler_dependency("") == Ok(Nil)
+}
+
 pub fn cargo_toml_test() {
   assert string.contains(rust.cargo_toml(library([], [])), "name = \"app_nif\"")
   assert string.contains(

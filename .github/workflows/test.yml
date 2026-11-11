@@ -6,6 +6,10 @@ on:
       - master
       - main
   pull_request:
+  # Weekly, so new Rust releases are tested even when nothing is pushed.
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
 
 jobs:
   test:
@@ -32,6 +36,10 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         example: [demo, linking]
     runs-on: ${{ matrix.os }}
+    env:
+      # Generated code must compile cleanly for users. This also catches
+      # Rustler deprecations, which come a release before removals.
+      RUSTFLAGS: -D warnings
     defaults:
       run:
         working-directory: examples/${{ matrix.example }}

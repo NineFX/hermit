@@ -369,6 +369,19 @@ Native code runs inside the VM, with fewer protections than Rust:
 - Calls that block, or take longer than about a millisecond, belong on a
   dirty scheduler.
 
+## Upgrading Rustler
+
+Each hermit release generates code for one Rustler release series, and new
+crates depend on that series in `Cargo.toml`.
+This release targets Rustler 0.39.
+Hermit never changes `Cargo.toml` once it exists, so when you upgrade to a
+hermit release that targets a newer series, update the `rustler` line
+yourself. Until you do, `generate` and `build` print a warning:
+
+```text
+warning: native/my_app_native/Cargo.toml depends on rustler 0.39, but this version of hermit generates code for rustler 0.40. Change the dependency to `rustler = "0.40"`.
+```
+
 ## How it works
 
 Hermit is a small compiler with a front end and back ends that meet in a
@@ -411,4 +424,21 @@ gleam run -m hermit build  # Regenerate and compile the example's NIFs
 gleam test                 # Call every NIF from Gleam
 ```
 
-CI runs all of this on Linux, macOS, and Windows.
+CI runs all of this on Linux, macOS, and Windows, for every push and pull
+request and once a week, so new Rust releases are tested too. It compiles the
+examples with warnings as errors, which catches deprecations in the generated
+code before Rustler removes what they warn about.
+
+Dependabot checks weekly for new releases of Rustler and the other crates the
+examples use. For each one, it opens a pull request that updates both
+examples, and CI tests the release. When a Rustler release starts a new series,
+such as 0.40, `gleam test` fails on that pull request until `rustler_version`
+in [`src/hermit/rust.gleam`](src/hermit/rust.gleam) matches it. To finish the
+upgrade on that pull request:
+
+1. Set `rustler_version` to the new series, and update the version named
+   under [Upgrading Rustler](#upgrading-rustler).
+2. If the generated code no longer compiles, or compiles with warnings, fix
+   the generator in `src/hermit/rust.gleam`.
+3. Run `gleam run -m hermit build` in each example, and update its `lib.rs`
+   if the hand-written code needs changes too.

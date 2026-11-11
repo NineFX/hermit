@@ -152,10 +152,9 @@ fn generate_library(library: ir.Library) -> Result(Nil, String) {
     crate_dir <> "/src/generated.rs",
     rust.generated_rs(library),
   ))
-  use _ <- result.try(scaffold(
-    crate_dir <> "/Cargo.toml",
-    rust.cargo_toml(library),
-  ))
+  let cargo_toml = crate_dir <> "/Cargo.toml"
+  use _ <- result.try(scaffold(cargo_toml, rust.cargo_toml(library)))
+  check_rustler_version(cargo_toml)
   use _ <- result.try(scaffold(crate_dir <> "/.gitignore", rust.gitignore))
   use created <- result.try(scaffold(
     crate_dir <> "/src/lib.rs",
@@ -225,6 +224,32 @@ fn write(
   |> result.map_error(fn(error) {
     "could not write " <> path <> ": " <> simplifile.describe_error(error)
   })
+}
+
+/// Warns when the crate depends on a Rustler release series other than the
+/// one generated code is written for, since it would likely fail to build.
+/// Hermit never changes `Cargo.toml` once it exists, so this is how users
+/// learn to update it after upgrading hermit.
+fn check_rustler_version(cargo_toml: String) -> Nil {
+  let checked =
+    simplifile.read(cargo_toml)
+    |> result.unwrap("")
+    |> rust.check_rustler_dependency
+  case checked {
+    Ok(Nil) -> Nil
+    Error(requirement) ->
+      io.println_error(
+        "warning: "
+        <> cargo_toml
+        <> " depends on rustler "
+        <> requirement
+        <> ", but this version of hermit generates code for rustler "
+        <> rust.rustler_version
+        <> ". Change the dependency to `rustler = \""
+        <> rust.rustler_version
+        <> "\"`.",
+      )
+  }
 }
 
 /// Points out NIFs and resources the Gleam module declares that the crate
