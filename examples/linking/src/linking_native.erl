@@ -21,7 +21,10 @@ init() ->
             Dir ->
                 Dir
         end,
-    case erlang:load_nif(filename:join(PrivDir, "liblinking_native"), 0) of
+    %% On Windows, the library's directory is searched for the libraries it
+    %% links against only if its path uses backslashes.
+    Library = filename:nativename(filename:join(PrivDir, "liblinking_native")),
+    case erlang:load_nif(Library, 0) of
         ok ->
             ok;
         {error, {_, Text}} = Error ->
